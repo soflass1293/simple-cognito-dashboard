@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="https://bootswatch.com/5/lux/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/jsnview/build/index.css"
+    />
+    <title>Cognito Manager</title>
+    <style>
+      .card {
+        margin-bottom: 20px;
+      }
+      .tab-content {
+        padding: 20px 0;
+      }
+      .action-buttons {
+        margin-top: 10px;
+      }
+      .json-viewer {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 15px;
+      }
+      .modal {
+        display: block;
+        background: rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Main App Structure -->
+    <div id="app">
+      <div v-scope="CognitoManager()" @vue:mounted="init">
+        <div v-scope="AppNav()"></div>
+        <div class="container mt-4">
+          <!-- Your existing content -->
+        </div>
+      </div>
+    </div>
+
+  <template id="app-template">
+    <div class="main px-5">
+      <div v-if="error" class="alert alert-danger">{{ error }}</div>
+
+      <div class="row" v-show="showConfig">
+        <div class="col-3">
+          <label class="form-label">Region</label>
+          <input v-model="config.region" class="form-control" />
+        </div>
+        <div class="col-3">
+          <label class="form-label">Access Key</label>
+          <input v-model="config.accessKeyId" class="form-control" />
+        </div>
+        <div class="col-3">
+          <label class="form-label">Endpoint (For local)</label>
+          <input v-model="config.endpoint" class="form-control" />
+        </div>
+        <div class="col-3">
+          <label class="form-label">.</label>
+          <br />
+          <button @click="initClient" class="btn btn-primary">Connect</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-12">
+          <div class="tab-content">
+            <!-- User Pools Tab -->
+            <div v-if="activeTab === 'userPools'">
+              <div class="d-flex justify-content-between mb-3">
+                <h4>User Pools</h4>
+                <button
+                  @click="listUserPools"
+                  class="btn btn-sm btn-outline-secondary"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div v-if="userPoolsLoading" class="text-center">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+
+              <div v-else>
+                <div class="list-group">
+                  <div
+                    v-for="pool in userPools"
+                    :key="pool.Id"
+                    class="list-group-item"
+                  >
+                    <div class="d-flex justify-content-between">
+                      <div>
+                        <h5>{{ pool.Name }}</h5>
+                        <small class="text-muted">ID: {{ pool.Id }}</small>
+                      </div>
+                      <div>
+                        <button
+                          @click="showPoolDetails(pool.Id)"
+                          class="btn btn-sm btn-outline-primary me-2"
+                        >
+                          Details
+                        </button>
+                        <button
+                          @click="listUsers(pool.Id)"
+                          class="btn btn-sm btn-outline-success"
+                        >
+                          Users
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="selectedPool" class="mt-4">
+                  <div class="card">
+                    <div class="card-header">
+                      Pool Details: {{ selectedPool.Name }}
+                      <button
+                        @click="selectedPool = null"
+                        class="btn btn-sm btn-danger"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        @click="selectedPool = null"
+                        class="btn btn-sm btn-outline-secondary float-end"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div class="card-body">
+                      <div v-scope="Viewer({payload: selectedPool})"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div v-if="activeTab === 'users'">
+              <div v-if="selectedUserPoolId">
+                <div class="d-flex justify-content-between mb-3">
+                  <h4>Users in Pool: {{ selectedUserPoolId }} 
+                    <button
+                      @click="activeTab='userPools'"
+                      class="btn btn-sm btn-outline-secondary me-2"
+                    >
+                      Change
+                    </button>
+                  </h4>
+                  <div>
+                    <button
+                      @click="listUsers(selectedUserPoolId)"
+                      class="btn btn-sm btn-outline-secondary me-2"
+                    >
+                      Refresh
+                    </button>
+                    <button
+                      @click="showCreateUserForm(selectedUserPoolId)"
+                      class="btn btn-sm btn-outline-primary"
+                    >
+                      Add User
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="usersLoading" class="text-center">
+                  <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+
+                <div v-else>
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="user in users" :key="user.Username">
+                        <td>{{ user.Username }}</td>
+                        <td>{{ getUserAttribute(user, 'email') }}</td>
+                        <td>
+                          <span
+                            :class="{'badge bg-success': user.UserStatus === 'CONFIRMED', 'badge bg-warning': user.UserStatus !== 'CONFIRMED'}"
+                          >
+                            {{ user.UserStatus }}
+                          </span>
+                        </td>
+                        <td>
+                          {{ new Date(user.UserCreateDate).toLocaleString() }}
+                        </td>
+                        <td>
+                          <button
+                            @click="showUserDetails(user.Username)"
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div v-if="selectedUser" class="mt-4">
+                  <div class="card">
+                    <div class="card-header">
+                      User Details: {{ selectedUser.Username }}
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary float-end"
+                        @click="selectedUser = null"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-danger"
+                        @click="deleteUser(selectedUser.Username)"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <div class="card-body">
+                      <div v-scope="Viewer({payload: selectedUser})"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="alert alert-info">
+                Please select a user pool first
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create User Modal -->
+      <div v-if="showUserForm" class="modal">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Create New User</h5>
+              <button @click="showUserForm = false" class="btn-close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input v-model="newUser.username" class="form-control" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input
+                  v-model="newUser.email"
+                  class="form-control"
+                  type="email"
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Temporary Password 
+                  <span role="button" @click="showTempPassword = !showTempPassword" class="btn btn-sm text-sm btn-secondary">Toggle</span>
+                </label>
+                <input
+                  v-model="newUser.tempPassword"
+                  class="form-control"
+                  :type="showTempPassword ? 'text': 'password'"
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="showUserForm = false" class="btn btn-secondary">
+                Cancel
+              </button>
+              <button @click="createUser" class="btn btn-primary">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+  <script src="https://cdn.jsdelivr.net/npm/jsnview/build/index.min.js"></script>
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1493.0.min.js"></script>
+  <script type="module">
+    import { createApp } from "https://unpkg.com/petite-vue?module";
+
+    const REGION="us-east-1"
+    const ACCESS_KEY_ID="test"
+    const SECRET_ACCESS_KEY="test"
+    const ENDPOINT="http://localhost:9229" // For local use
+    const TEMP_PASSWORD="Abc123$" // Can be set to any string
+
+    
+    const AppNav = (props) => ({
+      $template: `
+        <nav class="navbar navbar-expand-lg navbar-light bg-dark p-3">
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link text-light" href="index.html">Cognito Dashboard</a>
+          </li>
+        </ul>
+      </div>
+      <button class="btn btn-sm text-white" @click="showConfig=!showConfig">Config</button>
+    </nav>
+      `,
+    });
+
+    const Viewer = ({ payload }) => ({
+      payload,
+      $template: `
+        <div class="json-viewer">
+          <pre>{{ JSON.stringify(payload, null, 2) }}</pre>
+        </div>
+      `,
+    });
+
+    const CognitoManager = () => ({
+      AWS: window.AWS,
+      config: {
+        region: REGION,
+        accessKeyId: ACCESS_KEY_ID,
+        secretAccessKey: SECRET_ACCESS_KEY,
+        endpoint: ENDPOINT,
+      },
+      showConfig: true,
+      cognito: null,
+      activeTab: "userPools",
+      userPools: [],
+      userPoolsLoading: false,
+      selectedPool: null,
+      selectedUserPoolId: null,
+      selectedUser: null,
+      selectedUsername: null,
+      users: [],
+      usersLoading: false,
+      showUserForm: false,
+      newUser: {
+        username: "",
+        email: "",
+        tempPassword: TEMP_PASSWORD,
+      },
+      showTempPassword: false,
+      error: null,
+
+      init() {
+        this.initClient();
+      },
+
+      initClient() {
+        this.AWS.config.update(this.config);
+        this.cognito = new this.AWS.CognitoIdentityServiceProvider({
+          endpoint: this.config.endpoint,
+        });
+        this.showConfig = false;
+        this.listUserPools();
+      },
+
+      async listUserPools() {
+        this.userPoolsLoading = true;
+        try {
+          const data = await this.cognito
+            .listUserPools({ MaxResults: 10 })
+            .promise();
+          this.userPools = data.UserPools || [];
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        } finally {
+          this.userPoolsLoading = false;
+        }
+      },
+
+      async showPoolDetails(poolId) {
+        try {
+          this.selectedPool = null
+          const data = await this.cognito
+            .describeUserPool({ UserPoolId: poolId })
+            .promise();
+          this.selectedPool = data.UserPool;
+          this.error = null;
+        } catch (err) {
+          this.selectedPool = null
+          this.error = err.message;
+          console.error(err);
+        }
+      },
+
+      async showUserDetails(username) {
+        try {
+          this.selectedUser = null
+          const data = await this.cognito
+            .adminGetUser({ Username: username, UserPoolId: this.selectedUserPoolId })
+            .promise();
+          this.selectedUser = data
+          this.error = null;
+        } catch (err) {
+          this.selectedUser = null
+          this.error = err.message;
+          console.error(err);
+        }
+      },
+
+      async listUsers(poolId) {
+        this.activeTab = "users";
+        this.selectedUserPoolId = poolId;
+        this.usersLoading = true;
+        try {
+          const data = await this.cognito
+            .listUsers({
+              UserPoolId: poolId,
+              Limit: 50,
+            })
+            .promise();
+          this.users = data.Users || [];
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        } finally {
+          this.usersLoading = false;
+        }
+      },
+
+      showCreateUserForm(poolId) {
+        this.selectedUserPoolId = poolId;
+        this.showUserForm = true;
+      },
+
+      async createUser() {
+        try {
+          await this.cognito
+            .adminCreateUser({
+              UserPoolId: this.selectedUserPoolId,
+              Username: this.newUser.username,
+              TemporaryPassword: this.newUser.tempPassword,
+              UserAttributes: [
+                { Name: "email", Value: this.newUser.email },
+                { Name: "email_verified", Value: "true" },
+              ],
+              MessageAction: "SUPPRESS",
+            })
+            .promise();
+          this.newUser.username=""
+          this.newUser.email=""
+          this.showUserForm = false;
+          this.listUsers(this.selectedUserPoolId);
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        }
+      },
+
+      async deleteUser(username) {
+        this.activeTab = "users";
+        this.usersLoading = true;
+        try {
+          const data = await this.cognito
+            .adminDeleteUser({
+              Username: username,
+              UserPoolId: this.selectedUserPoolId,
+            })
+            .promise();
+          this.selectedUser=null
+          this.listUsers(this.selectedUserPoolId)
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        } finally {
+          this.usersLoading = false;
+        }
+      },
+
+      getUserAttribute(user, attrName) {
+        const attr = user.Attributes?.find((a) => a.Name === attrName);
+        return attr ? attr.Value : "";
+      },
+
+      $template: "#app-template",
+    });
+
+    createApp({
+      AppNav,
+      Viewer,
+      CognitoManager,
+    }).mount("#app");
+  </script>
+</html>
