@@ -17,8 +17,8 @@ You will find those constants to update:
 # List user pools
 <img width="1440" alt="1" src="https://github.com/user-attachments/assets/13e2394c-1a6f-47fa-90c3-cddad4841add" />
 
-# List user pools
+# List users
 <img width="1440" alt="2" src="https://github.com/user-attachments/assets/c98eec8d-e3e6-4f88-8f5c-95ef55fbe80b" />
 
-# List user pools
+# Create a user
 <img width="1440" alt="3" src="https://github.com/user-attachments/assets/acb95fb9-ac60-4f61-8f96-658a86498137" />
