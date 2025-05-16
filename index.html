@@ -45,269 +45,389 @@
       </div>
     </div>
 
-  <template id="app-template">
-    <div class="main px-5">
-      <div v-if="error" class="alert alert-danger">{{ error }}</div>
+    <template id="app-template">
+      <div class="main px-5">
+        <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
-      <div class="row" v-show="showConfig">
-        <div class="col-3">
-          <label class="form-label">Region</label>
-          <input v-model="config.region" class="form-control" />
+        <div class="row" v-show="showConfig">
+          <div class="col-3">
+            <label class="form-label">Region</label>
+            <input v-model="config.region" class="form-control" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">Access Key</label>
+            <input v-model="config.accessKeyId" class="form-control" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">Endpoint (For local)</label>
+            <input v-model="config.endpoint" class="form-control" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">.</label>
+            <br />
+            <button @click="initClient" class="btn btn-primary">Connect</button>
+          </div>
         </div>
-        <div class="col-3">
-          <label class="form-label">Access Key</label>
-          <input v-model="config.accessKeyId" class="form-control" />
-        </div>
-        <div class="col-3">
-          <label class="form-label">Endpoint (For local)</label>
-          <input v-model="config.endpoint" class="form-control" />
-        </div>
-        <div class="col-3">
-          <label class="form-label">.</label>
-          <br />
-          <button @click="initClient" class="btn btn-primary">Connect</button>
-        </div>
-      </div>
 
-      <div class="row">
-        <div class="col-md-12">
-          <div class="tab-content">
-            <!-- User Pools Tab -->
-            <div v-if="activeTab === 'userPools'">
-              <div class="d-flex justify-content-between mb-3">
-                <h4>User Pools</h4>
-                <button
-                  @click="listUserPools"
-                  class="btn btn-sm btn-outline-secondary"
-                >
-                  Refresh
-                </button>
-              </div>
-
-              <div v-if="userPoolsLoading" class="text-center">
-                <div class="spinner-border" role="status">
-                  <span class="visually-hidden">Loading...</span>
-                </div>
-              </div>
-
-              <div v-else>
-                <div class="list-group">
-                  <div
-                    v-for="pool in userPools"
-                    :key="pool.Id"
-                    class="list-group-item"
-                  >
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <h5>{{ pool.Name }}</h5>
-                        <small class="text-muted">ID: {{ pool.Id }}</small>
-                      </div>
-                      <div>
-                        <button
-                          @click="showPoolDetails(pool.Id)"
-                          class="btn btn-sm btn-outline-primary me-2"
-                        >
-                          Details
-                        </button>
-                        <button
-                          @click="listUsers(pool.Id)"
-                          class="btn btn-sm btn-outline-success"
-                        >
-                          Users
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="selectedPool" class="mt-4">
-                  <div class="card">
-                    <div class="card-header">
-                      Pool Details: {{ selectedPool.Name }}
-                      <button
-                        @click="selectedPool = null"
-                        class="btn btn-sm btn-danger"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        @click="selectedPool = null"
-                        class="btn btn-sm btn-outline-secondary float-end"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <div class="card-body">
-                      <div v-scope="Viewer({payload: selectedPool})"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Users Tab -->
-            <div v-if="activeTab === 'users'">
-              <div v-if="selectedUserPoolId">
+        <div class="row">
+          <div class="col-md-12">
+            <div class="tab-content">
+              <!-- User Pools Tab -->
+              <div v-if="activeTab === 'userPools'">
                 <div class="d-flex justify-content-between mb-3">
-                  <h4>Users in Pool: {{ selectedUserPoolId }} 
+                  <div class="d-inline">
+                    <span class="display-6 weight-bold">User Pools</span>
                     <button
-                      @click="activeTab='userPools'"
-                      class="btn btn-sm btn-outline-secondary me-2"
+                      @click="createUserPool"
+                      class="btn btn-sm btn-outline-secondary"
                     >
-                      Change
-                    </button>
-                  </h4>
-                  <div>
-                    <button
-                      @click="listUsers(selectedUserPoolId)"
-                      class="btn btn-sm btn-outline-secondary me-2"
-                    >
-                      Refresh
-                    </button>
-                    <button
-                      @click="showCreateUserForm(selectedUserPoolId)"
-                      class="btn btn-sm btn-outline-primary"
-                    >
-                      Add User
+                      Create
                     </button>
                   </div>
+                  <button
+                    @click="listUserPools"
+                    class="btn btn-sm btn-outline-secondary"
+                  >
+                    Refresh
+                  </button>
                 </div>
 
-                <div v-if="usersLoading" class="text-center">
+                <div v-if="userPoolsLoading" class="text-center">
                   <div class="spinner-border" role="status">
                     <span class="visually-hidden">Loading...</span>
                   </div>
                 </div>
 
                 <div v-else>
-                  <table class="table table-hover">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="user in users" :key="user.Username">
-                        <td>{{ user.Username }}</td>
-                        <td>{{ getUserAttribute(user, 'email') }}</td>
-                        <td>
-                          <span
-                            :class="{'badge bg-success': user.UserStatus === 'CONFIRMED', 'badge bg-warning': user.UserStatus !== 'CONFIRMED'}"
-                          >
-                            {{ user.UserStatus }}
-                          </span>
-                        </td>
-                        <td>
-                          {{ new Date(user.UserCreateDate).toLocaleString() }}
-                        </td>
-                        <td>
+                  <div class="list-group">
+                    <div
+                      v-for="pool in userPools"
+                      :key="pool.Id"
+                      class="list-group-item"
+                    >
+                      <div class="d-flex justify-content-between">
+                        <div>
+                          <h5>{{ pool.Name }}</h5>
+                          <small class="text-muted">ID: {{ pool.Id }}</small>
+                        </div>
+                        <div>
                           <button
-                            @click="showUserDetails(user.Username)"
-                            type="button"
-                            class="btn btn-sm btn-outline-primary"
+                            @click="showPoolDetails(pool.Id)"
+                            class="btn btn-sm btn-outline-primary me-2"
                           >
                             Details
                           </button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div v-if="selectedUser" class="mt-4">
-                  <div class="card">
-                    <div class="card-header">
-                      User Details: {{ selectedUser.Username }}
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary float-end"
-                        @click="selectedUser = null"
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-danger"
-                        @click="deleteUser(selectedUser.Username)"
-                      >
-                        Delete
-                      </button>
+                          <button
+                            @click="listUserPoolClients(pool.Id)"
+                            class="btn btn-sm btn-outline-info me-2"
+                          >
+                            Clients
+                          </button>
+                          <button
+                            @click="listUsers(pool.Id)"
+                            class="btn btn-sm btn-outline-success"
+                          >
+                            Users
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div class="card-body">
-                      <div v-scope="Viewer({payload: selectedUser})"></div>
+                  </div>
+
+                  <div v-if="selectedPool" class="mt-4">
+                    <div class="card">
+                      <div class="card-header">
+                        Pool Details: {{ selectedPool.Name }}
+                        <button
+                          @click="selectedPool = null"
+                          class="btn btn-sm btn-danger"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          @click="selectedPool = null"
+                          class="btn btn-sm btn-outline-secondary float-end"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div class="card-body">
+                        <div v-scope="Viewer({payload: selectedPool})"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div v-else class="alert alert-info">
-                Please select a user pool first
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Create User Modal -->
-      <div v-if="showUserForm" class="modal">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Create New User</h5>
-              <button @click="showUserForm = false" class="btn-close"></button>
+              <!-- Users Tab -->
+              <div v-if="activeTab === 'users'">
+                <div v-if="selectedUserPoolId">
+                  <div class="d-flex justify-content-between mb-3">
+                    <h4>
+                      Users in Pool: {{ selectedUserPoolId }}
+                      <button
+                        @click="activeTab='userPools'"
+                        class="btn btn-sm btn-outline-secondary me-2"
+                      >
+                        Change
+                      </button>
+                    </h4>
+                    <div>
+                      <button
+                        @click="listUsers(selectedUserPoolId)"
+                        class="btn btn-sm btn-outline-secondary me-2"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        @click="showCreateUserForm(selectedUserPoolId)"
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        Add User
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="usersLoading" class="text-center">
+                    <div class="spinner-border" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+
+                  <div v-else>
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>Username</th>
+                          <th>Email</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="user in users" :key="user.Username">
+                          <td>{{ user.Username }}</td>
+                          <td>{{ getUserAttribute(user, 'email') }}</td>
+                          <td>
+                            <span
+                              :class="{'badge bg-success': user.UserStatus === 'CONFIRMED', 'badge bg-warning': user.UserStatus !== 'CONFIRMED'}"
+                            >
+                              {{ user.UserStatus }}
+                            </span>
+                          </td>
+                          <td>
+                            {{ new Date(user.UserCreateDate).toLocaleString() }}
+                          </td>
+                          <td>
+                            <button
+                              @click="showUserDetails(user.Username)"
+                              type="button"
+                              class="btn btn-sm btn-outline-primary"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div v-if="selectedUser" class="mt-4">
+                    <div class="card">
+                      <div class="card-header">
+                        User Details: {{ selectedUser.Username }}
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary float-end"
+                          @click="selectedUser = null"
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-danger"
+                          @click="deleteUser(selectedUser.Username)"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <div class="card-body">
+                        <div v-scope="Viewer({payload: selectedUser})"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="alert alert-info">
+                  Please select a user pool first
+                </div>
+              </div>
+
+              <!-- Users Tab -->
+              <div v-if="activeTab === 'user-pool-clients'">
+                <div v-if="selectedUserPoolId">
+                  <div class="d-flex justify-content-between mb-3">
+                    <h4>
+                      Users in Pool: {{ selectedUserPoolId }}
+                      <button
+                        @click="activeTab='userPools'"
+                        class="btn btn-sm btn-outline-secondary me-2"
+                      >
+                        Change
+                      </button>
+                    </h4>
+                    <div>
+                      <button
+                        @click="listUserPoolClients(selectedUserPoolId)"
+                        class="btn btn-sm btn-outline-secondary me-2"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        @click="createUserPoolClient(selectedUserPoolId)"
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        Add client
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="usersLoading" class="text-center">
+                    <div class="spinner-border" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+
+                  <div v-else>
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Name</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="client in userPoolClients"
+                          :key="client.ClientId"
+                        >
+                          <td>{{ client.ClientId }}</td>
+                          <td>{{ client.ClientName }}</td>
+                          <td>
+                            <button
+                              @click="deleteUserPoolClientDetails(client.ClientId)"
+                              type="button"
+                              class="btn btn-sm btn-danger"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div v-if="selectedUser" class="mt-4">
+                    <div class="card">
+                      <div class="card-header">
+                        User Details: {{ selectedUser.Username }}
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary float-end"
+                          @click="selectedUser = null"
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-danger"
+                          @click="deleteUser(selectedUser.Username)"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <div class="card-body">
+                        <div v-scope="Viewer({payload: selectedUser})"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="alert alert-info">
+                  Please select a user pool first
+                </div>
+              </div>
             </div>
-            <div class="modal-body">
-              <div class="mb-3">
-                <label class="form-label">Username</label>
-                <input v-model="newUser.username" class="form-control" />
+          </div>
+        </div>
+
+        <!-- Create User Modal -->
+        <div v-if="showUserForm" class="modal">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Create New User</h5>
+                <button
+                  @click="showUserForm = false"
+                  class="btn-close"
+                ></button>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input
-                  v-model="newUser.email"
-                  class="form-control"
-                  type="email"
-                />
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Username</label>
+                  <input v-model="newUser.username" class="form-control" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Email</label>
+                  <input
+                    v-model="newUser.email"
+                    class="form-control"
+                    type="email"
+                  />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label"
+                    >Temporary Password
+                    <span
+                      role="button"
+                      @click="showTempPassword = !showTempPassword"
+                      class="btn btn-sm text-sm btn-secondary"
+                      >Toggle</span
+                    >
+                  </label>
+                  <input
+                    v-model="newUser.tempPassword"
+                    class="form-control"
+                    :type="showTempPassword ? 'text': 'password'"
+                  />
+                </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Temporary Password 
-                  <span role="button" @click="showTempPassword = !showTempPassword" class="btn btn-sm text-sm btn-secondary">Toggle</span>
-                </label>
-                <input
-                  v-model="newUser.tempPassword"
-                  class="form-control"
-                  :type="showTempPassword ? 'text': 'password'"
-                />
+              <div class="modal-footer">
+                <button @click="showUserForm = false" class="btn btn-secondary">
+                  Cancel
+                </button>
+                <button @click="createUser" class="btn btn-primary">
+                  Create
+                </button>
               </div>
-            </div>
-            <div class="modal-footer">
-              <button @click="showUserForm = false" class="btn btn-secondary">
-                Cancel
-              </button>
-              <button @click="createUser" class="btn btn-primary">
-                Create
-              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </template>
+    </template>
+  </body>
   <script src="https://cdn.jsdelivr.net/npm/jsnview/build/index.min.js"></script>
   <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1493.0.min.js"></script>
   <script type="module">
     import { createApp } from "https://unpkg.com/petite-vue?module";
+    import {
+      REGION,
+      ACCESS_KEY_ID,
+      SECRET_ACCESS_KEY,
+      ENDPOINT,
+      TEMP_PASSWORD,
+    } from "./src/utils/constants.js";
 
-    const REGION="us-east-1"
-    const ACCESS_KEY_ID="test"
-    const SECRET_ACCESS_KEY="test"
-    const ENDPOINT="http://localhost:9229" // For local use
-    const TEMP_PASSWORD="Abc123$" // Can be set to any string
-
-    
     const AppNav = (props) => ({
       $template: `
         <nav class="navbar navbar-expand-lg navbar-light bg-dark p-3">
@@ -322,7 +442,6 @@
     </nav>
       `,
     });
-
     const Viewer = ({ payload }) => ({
       payload,
       $template: `
@@ -351,6 +470,10 @@
       selectedUsername: null,
       users: [],
       usersLoading: false,
+      usersPoolClientsLoading: false,
+      userPoolClients: [],
+      userPoolClientsLoading: false,
+      selectedClientPool: null,
       showUserForm: false,
       newUser: {
         username: "",
@@ -373,6 +496,24 @@
         this.listUserPools();
       },
 
+      async createUserPool() {
+        this.userPoolsLoading = true;
+        try {
+          const name = prompt("Give a name for the user pool");
+          if (!name) return;
+          const data = await this.cognito
+            .createUserPool({ PoolName: name })
+            .promise();
+          this.listUserPools();
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        } finally {
+          this.userPoolsLoading = false;
+        }
+      },
+
       async listUserPools() {
         this.userPoolsLoading = true;
         try {
@@ -391,14 +532,14 @@
 
       async showPoolDetails(poolId) {
         try {
-          this.selectedPool = null
+          this.selectedPool = null;
           const data = await this.cognito
             .describeUserPool({ UserPoolId: poolId })
             .promise();
           this.selectedPool = data.UserPool;
           this.error = null;
         } catch (err) {
-          this.selectedPool = null
+          this.selectedPool = null;
           this.error = err.message;
           console.error(err);
         }
@@ -406,14 +547,17 @@
 
       async showUserDetails(username) {
         try {
-          this.selectedUser = null
+          this.selectedUser = null;
           const data = await this.cognito
-            .adminGetUser({ Username: username, UserPoolId: this.selectedUserPoolId })
+            .adminGetUser({
+              Username: username,
+              UserPoolId: this.selectedUserPoolId,
+            })
             .promise();
-          this.selectedUser = data
+          this.selectedUser = data;
           this.error = null;
         } catch (err) {
-          this.selectedUser = null
+          this.selectedUser = null;
           this.error = err.message;
           console.error(err);
         }
@@ -459,8 +603,8 @@
               MessageAction: "SUPPRESS",
             })
             .promise();
-          this.newUser.username=""
-          this.newUser.email=""
+          this.newUser.username = "";
+          this.newUser.email = "";
           this.showUserForm = false;
           this.listUsers(this.selectedUserPoolId);
           this.error = null;
@@ -480,13 +624,70 @@
               UserPoolId: this.selectedUserPoolId,
             })
             .promise();
-          this.selectedUser=null
-          this.listUsers(this.selectedUserPoolId)
+          this.selectedUser = null;
+          this.listUsers(this.selectedUserPoolId);
         } catch (err) {
           this.error = err.message;
           console.error(err);
         } finally {
           this.usersLoading = false;
+        }
+      },
+
+      async createUserPoolClient() {
+        try {
+          const name = prompt(
+            "Give a name for the client of " + this.selectedUserPoolId
+          );
+          if (!name) return;
+          await this.cognito
+            .createUserPoolClient({
+              UserPoolId: this.selectedUserPoolId,
+              ClientName: name,
+            })
+            .promise();
+          this.listUserPoolClients(this.selectedUserPoolId);
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        }
+      },
+
+      async listUserPoolClients(poolId) {
+        this.activeTab = "user-pool-clients";
+        this.selectedUserPoolId = poolId;
+        this.usersPoolClientsLoading = true;
+        try {
+          const data = await this.cognito
+            .listUserPoolClients({
+              UserPoolId: poolId,
+              MaxResults: 100,
+            })
+            .promise();
+          this.userPoolClients = data.UserPoolClients || [];
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
+        } finally {
+          this.usersPoolClientsLoading = false;
+        }
+      },
+
+      async deleteUserPoolClientDetails(id) {
+        try {
+          const data = await this.cognito
+            .deleteUserPoolClient({
+              ClientId: id,
+              UserPoolId: this.selectedUserPoolId,
+            })
+            .promise();
+          this.listUserPoolClients(this.selectedUserPoolId);
+          this.error = null;
+        } catch (err) {
+          this.error = err.message;
+          console.error(err);
         }
       },
 
